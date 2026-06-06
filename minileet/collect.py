@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 from pathlib import Path
 from typing import Iterable
 
@@ -20,10 +21,15 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     parser.add_argument("--no-hidden-traces", action="store_true")
     parser.add_argument("--limit-tasks", type=int, default=0)
+    parser.add_argument("--sample-tasks", type=int, default=0)
+    parser.add_argument("--visible-passing-only", action="store_true")
     args = parser.parse_args()
 
     tasks = suite_tasks(args.suite)
-    if args.limit_tasks:
+    if args.sample_tasks:
+        rng = random.Random(args.seed)
+        tasks = tuple(rng.sample(list(tasks), min(args.sample_tasks, len(tasks))))
+    elif args.limit_tasks:
         tasks = tasks[: args.limit_tasks]
 
     out_path = Path(args.out)
@@ -36,6 +42,7 @@ def main() -> None:
         seed=args.seed,
         include_hidden_traces=not args.no_hidden_traces,
         suite=args.suite,
+        visible_passing_only=args.visible_passing_only,
     )
     print(
         "wrote "
@@ -53,6 +60,7 @@ def collect_jsonl(
     seed: int,
     include_hidden_traces: bool,
     suite: str,
+    visible_passing_only: bool = False,
 ) -> dict[str, int]:
     rows = 0
     visible_execs = 0
@@ -65,6 +73,8 @@ def collect_jsonl(
                     break
                 visible = env.run_visible(program)
                 result = env.evaluate(program)
+                if visible_passing_only and result.visible_pass_rate < 1.0:
+                    continue
                 visible_execs += len(visible)
                 hidden_execs += len(result.hidden)
                 row = {

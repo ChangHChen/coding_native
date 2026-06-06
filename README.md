@@ -24,6 +24,9 @@ python3 -m minileet.cli eval --suite eval
 python3 -m minileet.cli eval --suite eval --baseline enumerative --budget 512
 python3 -m minileet.collect --suite train --budget 512 --hidden-count 64 --out data/train_enum.jsonl
 python3 -m minileet.collect --suite procedural_train --budget 512 --hidden-count 32 --out data/proc_train_enum.jsonl
+python3 -m minileet.filter_dataset --input data/proc_train_250_enum.jsonl --out data/proc_train_250_visible_pass.jsonl --visible-passing-only
+python3 -m minileet.collect --suite procedural_hard_train --sample-tasks 200 --budget 512 --hidden-count 32 --out data/hard_train_200_visible_pass.jsonl --visible-passing-only --no-hidden-traces --seed 7
+python3 -m minileet.collect --suite procedural_hard_eval --sample-tasks 100 --budget 512 --hidden-count 32 --out data/hard_eval_100_enum.jsonl --no-hidden-traces --seed 7
 python3 -m minileet.audit data/train_enum.jsonl
 python3 -m minileet.rerank --train data/train_enum.jsonl --eval data/eval_enum.jsonl
 python3 -m minileet.rerank --train data/proc_train_250_enum.jsonl --eval data/proc_eval_60_enum.jsonl --epochs 120 --hidden 128 --max-tokens 512

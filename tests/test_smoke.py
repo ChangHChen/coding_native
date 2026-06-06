@@ -9,11 +9,12 @@ from minileet.dsl import Assign, Binary, BoolLit, ForEach, Function, INT, Param,
 from minileet.env import MiniLeetEnv
 from minileet.interpreter import run_function
 from minileet.features import extract_features, fit_feature_spec, load_rows
+from minileet.filter_dataset import filter_jsonl
 from minileet.rerank import train_and_score
 from minileet.sequence import encode_row, fit_token_spec
 from minileet.search import enumerate_candidates, solve_with_enumeration
 from minileet.structured_rerank import StructuredConfig, train_and_score as train_structured
-from minileet.tasks import default_tasks, suite_tasks, task_by_name
+from minileet.tasks import default_tasks, suite_tasks, task_by_name, task_meta
 from minileet.transformer_rerank import TrainConfig, train_and_score as train_transformer
 from minileet.typecheck import typecheck_function
 
@@ -68,6 +69,15 @@ class EnvironmentTests(unittest.TestCase):
         self.assertGreaterEqual(len(eval_tasks), 100)
         self.assertEqual(len(names), len(set(names)))
 
+    def test_procedural_hard_split_holds_out_families(self) -> None:
+        train = suite_tasks("procedural_hard_train")
+        eval_tasks = suite_tasks("procedural_hard_eval")
+        self.assertGreaterEqual(len(train), 500)
+        self.assertGreaterEqual(len(eval_tasks), 100)
+        self.assertFalse(any(task_meta(task.name).family == "first_or_zero" for task in train))
+        self.assertTrue(any(task_meta(task.name).family == "first_or_zero" for task in eval_tasks))
+        self.assertTrue(any(task_meta(task.name).operator == "eq" for task in eval_tasks))
+
     def test_static_type_errors_fail_evaluation(self) -> None:
         task = task_by_name("sum_list")
         program = Function(
@@ -98,12 +108,49 @@ class EnvironmentTests(unittest.TestCase):
                 seed=0,
                 include_hidden_traces=False,
                 suite="train",
+                visible_passing_only=False,
             )
             self.assertEqual(stats["rows"], 3)
             audit = audit_jsonl(path)
             self.assertEqual(audit["rows"], 3)
             self.assertEqual(audit["tasks"], 1)
             self.assertEqual(audit["hidden_execs"], 6)
+
+    def test_visible_passing_only_collection(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "visible_pass.jsonl"
+            stats = collect_jsonl(
+                [task_by_name("all_nonnegative")],
+                path,
+                budget=64,
+                hidden_count=2,
+                seed=0,
+                include_hidden_traces=False,
+                suite="test",
+                visible_passing_only=True,
+            )
+            self.assertGreater(stats["rows"], 0)
+            rows = load_rows(path)
+            self.assertTrue(all(row["labels"]["visible_pass_rate"] == 1.0 for row in rows))
+
+    def test_filter_dataset_visible_passing_only(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "source.jsonl"
+            target = Path(tmpdir) / "target.jsonl"
+            collect_jsonl(
+                [task_by_name("all_nonnegative")],
+                source,
+                budget=64,
+                hidden_count=2,
+                seed=0,
+                include_hidden_traces=False,
+                suite="test",
+                visible_passing_only=False,
+            )
+            stats = filter_jsonl(source, target, visible_passing_only=True)
+            self.assertGreater(stats["read"], stats["wrote"])
+            rows = load_rows(target)
+            self.assertTrue(all(row["labels"]["visible_pass_rate"] == 1.0 for row in rows))
 
     def test_feature_and_rerank_smoke(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -116,6 +163,7 @@ class EnvironmentTests(unittest.TestCase):
                 seed=0,
                 include_hidden_traces=False,
                 suite="train",
+                visible_passing_only=False,
             )
             rows = load_rows(path)
             spec = fit_feature_spec(rows, max_tokens=16)
@@ -142,6 +190,7 @@ class EnvironmentTests(unittest.TestCase):
                 seed=0,
                 include_hidden_traces=False,
                 suite="train",
+                visible_passing_only=False,
             )
             rows = load_rows(path)
             spec = fit_token_spec(rows, max_vocab=64)
@@ -179,6 +228,7 @@ class EnvironmentTests(unittest.TestCase):
                 seed=0,
                 include_hidden_traces=False,
                 suite="train",
+                visible_passing_only=False,
             )
             rows = load_rows(path)
             result = train_structured(

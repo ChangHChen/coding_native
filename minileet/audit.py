@@ -6,6 +6,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from minileet.tasks import task_meta
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="minileet.audit")
@@ -24,6 +26,9 @@ def main() -> None:
     print(f"avg_hidden_pass_rate={stats['avg_hidden_pass_rate']:.3f}")
     print("hidden_pass_rate_buckets=" + json.dumps(stats["hidden_pass_rate_buckets"], sort_keys=True))
     print("return_types=" + json.dumps(stats["return_types"], sort_keys=True))
+    print("families=" + json.dumps(stats["families"], sort_keys=True))
+    print("operators=" + json.dumps(stats["operators"], sort_keys=True))
+    print("profiles=" + json.dumps(stats["profiles"], sort_keys=True))
 
 
 def audit_jsonl(path: Path) -> dict[str, Any]:
@@ -39,6 +44,9 @@ def audit_jsonl(path: Path) -> dict[str, Any]:
     programs: set[str] = set()
     buckets: Counter[str] = Counter()
     return_types: Counter[str] = Counter()
+    families: Counter[str] = Counter()
+    operators: Counter[str] = Counter()
+    profiles: Counter[str] = Counter()
     by_task: dict[str, int] = defaultdict(int)
 
     with path.open("r", encoding="utf-8") as handle:
@@ -48,10 +56,14 @@ def audit_jsonl(path: Path) -> dict[str, Any]:
             row = json.loads(line)
             rows += 1
             task_name = row["task"]["name"]
+            meta = task_meta(task_name)
             tasks.add(task_name)
             by_task[task_name] += 1
             programs.add(task_name + "\n" + row["program"]["rendered"])
             return_types[row["task"]["signature"]["return_type"]] += 1
+            families[meta.family] += 1
+            operators[meta.operator] += 1
+            profiles[meta.profile or "none"] += 1
 
             visible = row["visible"]
             visible_execs += len(visible)
@@ -79,6 +91,9 @@ def audit_jsonl(path: Path) -> dict[str, Any]:
         "avg_hidden_pass_rate": hidden_pass_rate_sum / rows if rows else 0.0,
         "hidden_pass_rate_buckets": dict(buckets),
         "return_types": dict(return_types),
+        "families": dict(families),
+        "operators": dict(operators),
+        "profiles": dict(profiles),
         "rows_by_task": dict(by_task),
     }
 
@@ -99,4 +114,3 @@ def _bucket(value: float) -> str:
 
 if __name__ == "__main__":
     main()
-

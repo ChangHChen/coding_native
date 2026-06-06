@@ -51,6 +51,15 @@ class Task:
 
 
 @dataclass(frozen=True)
+class TaskMeta:
+    family: str
+    predicate: str
+    operator: str
+    profile: str
+    has_k: bool
+
+
+@dataclass(frozen=True)
 class PredicateSpec:
     name: str
     params: tuple[Param, ...]
@@ -58,7 +67,19 @@ class PredicateSpec:
     sampler: InputSampler
 
 
-SUITE_NAMES = ("starter", "generated", "train", "eval", "all", "procedural_train", "procedural_eval")
+SUITE_NAMES = (
+    "starter",
+    "generated",
+    "train",
+    "eval",
+    "all",
+    "procedural_train",
+    "procedural_eval",
+    "procedural_standard_train",
+    "procedural_standard_eval",
+    "procedural_hard_train",
+    "procedural_hard_eval",
+)
 
 
 def default_tasks() -> tuple[Task, ...]:
@@ -142,7 +163,109 @@ def suite_tasks(suite: str = "starter") -> tuple[Task, ...]:
         return procedural_tasks(split="train")
     if suite == "procedural_eval":
         return procedural_tasks(split="eval")
+    if suite == "procedural_standard_train":
+        return procedural_standard_tasks(split="train")
+    if suite == "procedural_standard_eval":
+        return procedural_standard_tasks(split="eval")
+    if suite == "procedural_hard_train":
+        return procedural_hard_tasks(split="train")
+    if suite == "procedural_hard_eval":
+        return procedural_hard_tasks(split="eval")
     raise ValueError(f"unknown task suite {suite}")
+
+
+def all_procedural_tasks() -> tuple[Task, ...]:
+    return procedural_tasks(split="train") + procedural_tasks(split="eval")
+
+
+def procedural_standard_tasks(split: str, count: int = 0) -> tuple[Task, ...]:
+    if split not in ("train", "eval"):
+        raise ValueError(f"unknown standard split {split}")
+    tasks = all_procedural_tasks()
+    filtered = tuple(
+        task
+        for task in tasks
+        if (_standard_split_bucket(task.name) != 0 if split == "train" else _standard_split_bucket(task.name) == 0)
+    )
+    if count > 0:
+        return filtered[:count]
+    return filtered
+
+
+def task_meta(task_name: str) -> TaskMeta:
+    profiles = {name for name, _ in _sampler_profiles(0)}
+    parts = task_name.split("_")
+    profile = parts[-1] if parts and parts[-1] in profiles else ""
+    core_parts = parts[:-1] if profile else parts
+    if core_parts[:3] == ["first", "or", "zero"]:
+        family = "first_or_zero"
+        predicate_parts = core_parts[3:]
+    elif core_parts and core_parts[0] == "compare":
+        family = "compare"
+        predicate_parts = core_parts[1:]
+    else:
+        family = core_parts[0] if core_parts else "unknown"
+        predicate_parts = core_parts[1:]
+
+    predicate = "_".join(predicate_parts)
+    operator = _predicate_operator(predicate_parts)
+    return TaskMeta(
+        family=family,
+        predicate=predicate,
+        operator=operator,
+        profile=profile,
+        has_k="k" in predicate_parts,
+    )
+
+
+def procedural_hard_tasks(split: str, count: int = 0) -> tuple[Task, ...]:
+    if split not in ("train", "eval"):
+        raise ValueError(f"unknown hard split {split}")
+    heldout_families = {"first_or_zero"}
+    heldout_ops = {"eq", "ne"}
+    heldout_profiles = {"wide"}
+    tasks = procedural_tasks(split="train") + procedural_tasks(split="eval")
+    if split == "eval":
+        filtered = tuple(
+            task
+            for task in tasks
+            if _is_hard_eval_meta(task_meta(task.name), heldout_families, heldout_ops, heldout_profiles)
+        )
+    else:
+        filtered = tuple(
+            task
+            for task in tasks
+            if not _is_hard_eval_meta(task_meta(task.name), heldout_families, heldout_ops, heldout_profiles)
+        )
+    if count > 0:
+        return filtered[:count]
+    return filtered
+
+
+def _is_hard_eval_meta(
+    meta: TaskMeta,
+    heldout_families: set[str],
+    heldout_ops: set[str],
+    heldout_profiles: set[str],
+) -> bool:
+    return meta.family in heldout_families or meta.operator in heldout_ops or meta.profile in heldout_profiles
+
+
+def _predicate_operator(predicate_parts: list[str]) -> str:
+    if not predicate_parts:
+        return "none"
+    first = predicate_parts[0]
+    if first in {"gt", "ge", "lt", "le", "eq", "ne"}:
+        return first
+    if first in {"even", "odd"}:
+        return "parity"
+    if first in {"positive", "nonnegative", "negative", "zero"}:
+        return first
+    if first == "sum" and len(predicate_parts) > 1:
+        return _predicate_operator(predicate_parts[1:])
+    if first == "count" and len(predicate_parts) > 1:
+        return _predicate_operator(predicate_parts[1:])
+    return first
 
 
 def procedural_tasks(
@@ -477,6 +600,10 @@ def _with_k_sampler(base_sampler: InputSampler, low: int, high: int) -> InputSam
 
 def _procedural_split(name: str) -> str:
     return "eval" if zlib.adler32(("procedural:" + name).encode("utf-8")) % 5 == 0 else "train"
+
+
+def _standard_split_bucket(name: str) -> int:
+    return zlib.adler32(("standard:" + name).encode("utf-8")) % 5
 
 
 def _split_bucket(name: str) -> int:

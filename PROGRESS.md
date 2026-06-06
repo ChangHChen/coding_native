@@ -85,6 +85,60 @@ proc_eval_60_enum.jsonl:
 
 Data files are ignored by git via `.gitignore`.
 
+Focused reranker datasets:
+
+```text
+std_train_visible_pass.jsonl:
+  source:             procedural_standard_train, visible-pass rows only
+  rows/programs:      13,494
+  tasks:              1,024
+  solved:             3,945
+  visible-overfit:    9,549
+
+std_eval_enum.jsonl:
+  source:             procedural_standard_eval, all candidates
+  rows/programs:      46,980
+  tasks:              251
+  visible-pass rows:  3,227
+  solved:             955
+
+proc_train_250_visible_pass.jsonl:
+  source:             proc_train_250_enum.jsonl filtered to visible-pass rows
+  rows/programs:      3,265
+  tasks:              250
+  solved:             524
+  visible-overfit:    2,741
+
+hard_train_200_visible_pass.jsonl:
+  source:             procedural_hard_train sampled 200 tasks, visible-pass rows only
+  rows/programs:      2,707
+  tasks:              200
+  solved:             974
+  visible-overfit:    1,733
+  held out from train:
+    first_or_zero family
+    eq/ne operators
+    wide profile
+
+hard_train_all_visible_pass.jsonl:
+  source:             procedural_hard_train, visible-pass rows only
+  rows/programs:      7,501
+  tasks:              560
+  solved:             2,479
+  visible-overfit:    5,022
+
+hard_eval_100_enum.jsonl:
+  source:             procedural_hard_eval sampled 100 tasks, all candidates
+  rows/programs:      19,008
+  tasks:              100
+  visible-pass rows:  1,396
+  solved:             380
+  includes:
+    first_or_zero family
+    eq/ne operators
+    wide profile
+```
+
 ## Results
 
 Small split reranker:
@@ -119,6 +173,78 @@ Result:
   first_visible: selected=60/60 solved=21/60 mean_hidden=0.813 visible_overfit=39
   learned:       selected=60/60 solved=24/60 mean_hidden=0.875 visible_overfit=36
   oracle:        selected=60/60 solved=60/60 mean_hidden=1.000 visible_overfit=0
+```
+
+Medium procedural split reranker, visible-pass-focused training:
+
+```text
+Command:
+  python3 -m minileet.rerank \
+    --train data/proc_train_250_visible_pass.jsonl \
+    --eval data/proc_eval_60_enum.jsonl \
+    --epochs 120 \
+    --hidden 128 \
+    --max-tokens 512 \
+    --seed 0
+
+Result:
+  first_visible: selected=60/60 solved=21/60 mean_hidden=0.813 visible_overfit=39
+  learned:       selected=60/60 solved=41/60 mean_hidden=0.938 visible_overfit=19
+  oracle:        selected=60/60 solved=60/60 mean_hidden=1.000 visible_overfit=0
+```
+
+Standard 80/20-style procedural split reranker:
+
+```text
+Command:
+  python3 -m minileet.rerank \
+    --train data/std_train_visible_pass.jsonl \
+    --eval data/std_eval_enum.jsonl \
+    --epochs 120 \
+    --hidden 128 \
+    --max-tokens 512 \
+    --seed 0
+
+Result:
+  first_visible: selected=251/251 solved=96/251  mean_hidden=0.812 visible_overfit=155
+  learned:       selected=251/251 solved=153/251 mean_hidden=0.923 visible_overfit=98
+  oracle:        selected=251/251 solved=251/251 mean_hidden=1.000 visible_overfit=0
+```
+
+Hard split reranker, visible-pass-focused training:
+
+```text
+Command:
+  python3 -m minileet.rerank \
+    --train data/hard_train_200_visible_pass.jsonl \
+    --eval data/hard_eval_100_enum.jsonl \
+    --epochs 120 \
+    --hidden 128 \
+    --max-tokens 512 \
+    --seed 0
+
+Result:
+  first_visible: selected=100/100 solved=29/100 mean_hidden=0.796 visible_overfit=71
+  learned:       selected=100/100 solved=38/100 mean_hidden=0.830 visible_overfit=62
+  oracle:        selected=100/100 solved=100/100 mean_hidden=1.000 visible_overfit=0
+```
+
+Hard split reranker, all hard-train visible-pass rows:
+
+```text
+Command:
+  python3 -m minileet.rerank \
+    --train data/hard_train_all_visible_pass.jsonl \
+    --eval data/hard_eval_100_enum.jsonl \
+    --epochs 120 \
+    --hidden 128 \
+    --max-tokens 512 \
+    --seed 0
+
+Result:
+  first_visible: selected=100/100 solved=29/100 mean_hidden=0.796 visible_overfit=71
+  learned:       selected=100/100 solved=41/100 mean_hidden=0.828 visible_overfit=59
+  oracle:        selected=100/100 solved=100/100 mean_hidden=1.000 visible_overfit=0
 ```
 
 Medium procedural split Transformer reranker:
@@ -189,6 +315,15 @@ shorter first-stage sweeps, or a more efficient fusion layout.
 
 This is an early but useful signal that visible execution traces and program
 structure contain learnable information about hidden robustness.
+
+Important data conclusion:
+
+```text
+For reranker training, visible-pass-focused rows are a better training
+distribution than all candidate rows, because deployment selects among
+visible-passing candidates. The hard split is now a more meaningful
+generalization test because it holds out entire families/operators/profiles.
+```
 
 ## Current Limitations
 
