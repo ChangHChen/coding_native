@@ -144,6 +144,34 @@ Result:
   oracle:        selected=60/60 solved=60/60 mean_hidden=1.000 visible_overfit=0
 ```
 
+Medium procedural split shared-encoder structured reranker:
+
+```text
+Command:
+  python3 -m minileet.structured_rerank \
+    --train data/proc_train_250_enum.jsonl \
+    --eval data/proc_eval_60_enum.jsonl \
+    --epochs 4 \
+    --batch-size 128 \
+    --task-len 64 \
+    --program-len 256 \
+    --test-len 160 \
+    --d-model 128 \
+    --heads 4 \
+    --encoder-layers 3 \
+    --fusion-layers 1 \
+    --registers 2 \
+    --run-dir runs/structured_1m_medium \
+    --seed 0
+
+Result:
+  params:        903,861
+  epoch time:    about 59 seconds on RTX 3080
+  first_visible: selected=60/60 solved=21/60 mean_hidden=0.813 visible_overfit=39
+  structured:    selected=60/60 solved=23/60 mean_hidden=0.825 visible_overfit=37
+  oracle:        selected=60/60 solved=60/60 mean_hidden=1.000 visible_overfit=0
+```
+
 Interpretation:
 
 ```text
@@ -153,20 +181,25 @@ sequence reranker improves solved count beyond the feature MLP, but the feature
 MLP still has better mean hidden pass rate on the current medium split.
 ```
 
+The shared-encoder structured model is architecturally cleaner and logs
+properly, but its first medium run is weaker than both the feature MLP and flat
+Transformer. It also costs about six segment-encoder passes per candidate row.
+Before broad sweeps, improve throughput and/or use cached segment encodings,
+shorter first-stage sweeps, or a more efficient fusion layout.
+
 This is an early but useful signal that visible execution traces and program
 structure contain learnable information about hidden robustness.
 
 ## Current Limitations
 
-- The learned model is still feature-based, not a real code-native neural
-- The Transformer sequence model is implemented, but it is still a reranker,
-  not an action-conditioned dynamics model or diffusion repair model.
+- The learned models are still rerankers/value predictors, not
+  action-conditioned dynamics models or diffusion repair models.
 - The DSL is narrow: mostly list scans, predicates, aggregations, and simple
   comparisons.
 - The enumerator can express many current tasks, so the oracle-visible-gated
   score is artificially high.
 - Current training is candidate reranking, not AST-edit RL.
-- PyTorch is installed, but CUDA was not visible in the current shell.
+- CUDA is visible and training runs on the RTX 3080.
 
 ## Next Plan
 

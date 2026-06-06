@@ -1,0 +1,84 @@
+{
+  "config": {
+    "batch_size": 128,
+    "bce_weight": 0.2,
+    "d_model": 128,
+    "dropout": 0.1,
+    "encoder_layers": 3,
+    "epochs": 2,
+    "eval_every": 1,
+    "ff_mult": 4,
+    "fusion_layers": 1,
+    "heads": 4,
+    "lr": 0.0003,
+    "max_tests": 5,
+    "max_vocab": 1024,
+    "numeric_hidden": 64,
+    "program_len": 160,
+    "rank_weight": 0.1,
+    "registers": 2,
+    "seed": 0,
+    "task_len": 48,
+    "test_len": 96
+  },
+  "device": "cuda",
+  "eval_mse": 0.08396591991186142,
+  "first_visible": {
+    "mean_candidate_index": 27.076923076923077,
+    "mean_hidden_pass_rate": 0.8581730769230769,
+    "selected": 13,
+    "solved": 9,
+    "tasks": 13,
+    "visible_overfit": 4
+  },
+  "history": [
+    {
+      "cuda_allocated_mb": 31.017578125,
+      "cuda_peak_mb": 2459.5185546875,
+      "cuda_reserved_mb": 2544.0,
+      "elapsed_sec": 6.719625234603882,
+      "epoch": 1,
+      "eval_mse": 0.09266555309295654,
+      "mean_candidate": 59.69230769230769,
+      "selected": 13,
+      "selected_mean_hidden": 0.8774038461538461,
+      "selected_solved": 7,
+      "tasks": 13,
+      "train_loss": 0.20128203859696023,
+      "visible_overfit": 6
+    },
+    {
+      "cuda_allocated_mb": 31.017578125,
+      "cuda_peak_mb": 2459.5185546875,
+      "cuda_reserved_mb": 2544.0,
+      "elapsed_sec": 12.539973020553589,
+      "epoch": 2,
+      "eval_mse": 0.08396591991186142,
+      "mean_candidate": 58.92307692307692,
+      "selected": 13,
+      "selected_mean_hidden": 0.9158653846153846,
+      "selected_solved": 8,
+      "tasks": 13,
+      "train_loss": 0.16549712131311606,
+      "visible_overfit": 5
+    }
+  ],
+  "oracle_visible_gated": {
+    "mean_candidate_index": 34.30769230769231,
+    "mean_hidden_pass_rate": 1.0,
+    "selected": 13,
+    "solved": 13,
+    "tasks": 13,
+    "visible_overfit": 0
+  },
+  "params": 887861,
+  "structured_shared": {
+    "mean_candidate_index": 58.92307692307692,
+    "mean_hidden_pass_rate": 0.9158653846153846,
+    "selected": 13,
+    "solved": 8,
+    "tasks": 13,
+    "visible_overfit": 5
+  },
+  "train_mse": 0.0700172409415245
+}

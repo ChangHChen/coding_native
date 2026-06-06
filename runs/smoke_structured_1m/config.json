@@ -1,0 +1,31 @@
+{
+  "config": {
+    "batch_size": 128,
+    "bce_weight": 0.2,
+    "d_model": 128,
+    "dropout": 0.1,
+    "encoder_layers": 3,
+    "epochs": 2,
+    "eval_every": 1,
+    "ff_mult": 4,
+    "fusion_layers": 1,
+    "heads": 4,
+    "lr": 0.0003,
+    "max_tests": 5,
+    "max_vocab": 1024,
+    "numeric_hidden": 64,
+    "program_len": 160,
+    "rank_weight": 0.1,
+    "registers": 2,
+    "seed": 0,
+    "task_len": 48,
+    "test_len": 96
+  },
+  "device": "cuda",
+  "eval_path": "data/eval_enum.jsonl",
+  "eval_rows": 991,
+  "params": 887861,
+  "train_path": "data/train_enum.jsonl",
+  "train_rows": 3185,
+  "vocab": 211
+}
