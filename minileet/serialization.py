@@ -1,73 +1,40 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
-from minileet.dsl import Function
-from minileet.env import TestCaseResult
-from minileet.interpreter import RunResult, TraceEvent
-from minileet.tasks import Task
+from minileet.dsl import Program
+from minileet.env import EvalResult, Task
+
+REQUIRED_ROW_KEYS = {"task", "program", "labels", "provenance"}
+UNSCORED = "UNSCORED"
 
 
-def task_to_record(task: Task) -> dict[str, Any]:
+def row_for(task: Task, program: Program, result: EvalResult) -> dict[str, Any]:
     return {
-        "name": task.name,
-        "description": task.description,
-        "signature": {
-            "name": task.signature.name,
-            "params": [
-                {"name": param.name, "type": str(param.typ)}
-                for param in task.signature.params
-            ],
-            "return_type": str(task.signature.return_type),
+        "task": asdict(task),
+        "program": asdict(program),
+        "labels": {
+            "visible_total": len(result.visible),
+            "visible_passed": sum(c.passed for c in result.visible),
+            "hidden_total": len(result.hidden),
+            "hidden_passed": sum(c.passed for c in result.hidden),
+            "solved": result.solved,
         },
-        "visible_examples": [
-            {"args": _jsonable(args), "expected": _jsonable(expected)}
-            for args, expected in task.visible_examples
-        ],
+        "provenance": {"program_source": program.source},
     }
 
 
-def program_to_record(program: Function) -> dict[str, Any]:
-    return {
-        "rendered": program.render(),
-        "body_size": len(program.body),
-    }
-
-
-def testcase_to_record(testcase: TestCaseResult, include_trace: bool = True) -> dict[str, Any]:
-    return {
-        "args": _jsonable(testcase.args),
-        "expected": _jsonable(testcase.expected),
-        "passed": testcase.passed,
-        "run": run_to_record(testcase.run, include_trace=include_trace),
-    }
-
-
-def run_to_record(run: RunResult, include_trace: bool = True) -> dict[str, Any]:
-    record: dict[str, Any] = {
-        "ok": run.ok,
-        "value": _jsonable(run.value),
-        "error": run.error,
-        "trace_len": len(run.trace),
-    }
-    if include_trace:
-        record["trace"] = [trace_to_record(event) for event in run.trace]
-    return record
-
-
-def trace_to_record(event: TraceEvent) -> dict[str, Any]:
-    return {
-        "kind": event.kind,
-        "data": _jsonable(event.data),
-    }
-
-
-def _jsonable(value: Any) -> Any:
-    if isinstance(value, tuple):
-        return [_jsonable(item) for item in value]
-    if isinstance(value, list):
-        return [_jsonable(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _jsonable(item) for key, item in value.items()}
-    return value
-
+def audit_row_schema(row: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    missing = REQUIRED_ROW_KEYS - set(row)
+    if missing:
+        errors.append(f"missing keys: {sorted(missing)}")
+    labels = row.get("labels", {})
+    for key in ["visible_total", "visible_passed", "hidden_total", "hidden_passed", "solved"]:
+        if key not in labels:
+            errors.append(f"missing label {key}")
+    source = row.get("provenance", {}).get("program_source")
+    if source not in {"enumerated", "reference", "corrupt", "model"}:
+        errors.append("invalid program_source")
+    return errors

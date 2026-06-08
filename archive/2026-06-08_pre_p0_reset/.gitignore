@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/*.jsonl
+runs/**/*.pt
+runs/**/*.pth
+runs/**/*.ckpt
+models/**/*.pt
+models/**/*.pth
+models/**/*.ckpt
+sweeps/
